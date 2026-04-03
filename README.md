@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# flatted (Go)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A super light and fast circular JSON parser.
 
-Currently, two official plugins are available:
+## Usage
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```go
+package main
 
-## React Compiler
+import (
+	"fmt"
+	"github.com/WebReflection/flatted/golang/pkg/flatted"
+)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+type Group struct {
+	Name string `json:"name"`
+}
 
-## Expanding the ESLint configuration
+type User struct {
+	Name   string `json:"name"`
+	Friend *User  `json:"friend"`
+	Group  *Group `json:"group"`
+}
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+func main() {
+	group := &Group{Name: "Developers"}
+	alice := &User{Name: "Alice", Group: group}
+	bob := &User{Name: "Bob", Group: group}
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+	alice.Friend = bob
+	bob.Friend = alice // Circular reference
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+	// Stringify Alice
+	s, _ := flatted.Stringify(alice)
+	fmt.Println(s)
+	// Output: [{"name":"Alice","friend":"1","group":"2"},{"name":"Bob","friend":"0","group":"2"},{"name":"Developers"}]
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+	// Flattening in action:
+	// Index "0" is Alice, Index "1" is Bob, Index "2" is the shared Group.
+
+	// Parse back into a generic map structure
+	res, _ := flatted.Parse(s)
+	aliceMap := res.(map[string]any)
+	fmt.Println(aliceMap["name"]) // Alice
+}
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## CLI
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Build the binary using the provided Makefile:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+make build
+```
+
+Then use it to parse flatted JSON from stdin:
+
+```bash
+echo '[{"a":"1"},"b"]' | ./flatted
 ```
